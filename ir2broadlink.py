@@ -6,6 +6,51 @@ Creates broadlink b64 ir codes from a Sony lirc.conf file.
 from typing import Dict
 import requests
 
+def lirc_hex_to_binary(code_hex: str, bits: int) -> list[int]:
+    """
+    Converts a hex code into a binary, padded to the correct number of bits
+    """
+    # Convert hex string to a decimal integer
+    decimal_representation: int = int(code_hex, base=0)
+    # Convert decimal to binary string
+    binary_representation: str = f'{decimal_representation:b}'
+    # pad binary string with 0s to match the number of bits
+    padding_length: int = bits - len(binary_representation)
+    return '0' * padding_length + binary_representation
+
+def lirc_to_pulses(lirc_config: Dict) -> Dict:
+    """
+    Given an lirc config as a dictionary, convert the hex codes for 
+    each button into a set of timed pulses
+    """
+    header: dict = lirc_config['header']
+    one: dict = lirc_config['one']
+    zero: dict = lirc_config['zero']
+    codes: dict = lirc_config['codes']
+
+    button_pulses: dict = {}
+    for code in codes:
+        # Get the binary representation of the codes
+        number_of_bits = int(lirc_config['bits'])
+        binary_code: str = lirc_hex_to_binary(codes[code], number_of_bits)
+        # Start with a set of pulses for the header
+        pulses: list[tuple[int, int]] = []
+        pulse = (int(header['on']), int(header['off']))
+        pulses.append(pulse)
+            
+        # Now go through the binary string and add pulses
+        for bit in binary_code:
+            if bit == '1':
+                pulse = (int(one['on']), int(one['off']))
+            elif bit == '0':
+                pulse = (int(zero['on']), int(zero['off']))
+
+            pulses.append(pulse)
+        
+        button_pulses[code] = pulses
+                    
+    return button_pulses
+
 def get_conf_file(path: str) -> str:
     """
     Pulls an lirc.conf file from the given path and returns the page text
@@ -80,6 +125,7 @@ def parse_lirc(text: str) -> Dict[str, str]:
 def main(*args, **kwargs):
     lirc_text: str = get_conf_file(args[0]).text
     print(parse_lirc(lirc_text))
+    print(lirc_hex_to_binary('0x2A06', 14))
 
 if __name__=='__main__':
     main('https://sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/sony/RM-U306A.lircd.conf')
