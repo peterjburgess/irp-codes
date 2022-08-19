@@ -27,6 +27,10 @@ def lirc_to_pulses(lirc_config: Dict) -> Dict:
     one: dict = lirc_config['one']
     zero: dict = lirc_config['zero']
     codes: dict = lirc_config['codes']
+    repeats: str | None = lirc_config.pop('min_repeat', None)
+    gap: str | None = lirc_config.pop('gap', None)
+    ptrail: str | None = lirc_config.pop('ptrail', None)
+    flags: str | None = lirc_config.pop('flags', None)
 
     button_pulses: dict = {}
     for code in codes:
@@ -35,7 +39,7 @@ def lirc_to_pulses(lirc_config: Dict) -> Dict:
         binary_code: str = lirc_hex_to_binary(codes[code], number_of_bits)
         # Start with a set of pulses for the header
         pulses: list[tuple[int, int]] = []
-        pulse = (int(header['on']), int(header['off']))
+        pulse: tuple[int, int] = (int(header['on']), int(header['off']))
         pulses.append(pulse)
             
         # Now go through the binary string and add pulses
@@ -46,7 +50,22 @@ def lirc_to_pulses(lirc_config: Dict) -> Dict:
                 pulse = (int(zero['on']), int(zero['off']))
 
             pulses.append(pulse)
-        
+
+        # Finish with final pulse of the trail and gap
+        pulse_gap: int = 0
+        trail: int = 0
+        if flags and 'CONST_LENGTH' in flags:
+            pulse_gap = int(gap) - sum([sum(pulse_pair) for pulse_pair in pulses])
+        elif gap:
+            pulse_gap = int(gap)
+        if ptrail:
+            trail = int(ptrail)
+            pulse_gap = pulse_gap - trail
+            pulse = (trail, pulse_gap)
+
+        pulse = (trail, pulse_gap)
+        pulses.append(pulse)
+
         button_pulses[code] = pulses
                     
     return button_pulses
