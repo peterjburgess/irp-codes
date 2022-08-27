@@ -1,6 +1,6 @@
 # irp-codes
 
-A Python 3 project to create Broadlink base 64 ir codes when given a lirc.conf file, via Pronto hex.
+A Python 3 project to create Broadlink base 64 ir codes when given a lirc.conf file.
 
 ## Motivation
 
@@ -53,3 +53,17 @@ To demonstrate as an example, I will use the lirc file for my remote, the RM-U30
 - The code given for this function is 0x0186 in hex. This corresponds to 00 0001 1000 0110 in 14 bit binary, or 390 in decimal.
 - As the ptrail value corresponds to a value of 0, in 15 bit binary, (or bit encoding), this is equivalent to 000 0011 0000 1100, or 0x030C in hex, or 780 in decimal.
 - And in the official Sony encoding, the device code is 0000 1100 with the least significant digit first, which comes out to a device code of 30 in hex, or 48 in decimal. The command code is then 0000 011 in binary, with the least significant digit first, which corresponds to 0x60 hex, or 96 in decimal. As a sense check, this corresponds with the information on [this page](http://www.hifi-remote.com/sony/Sony_rcvr.htm), which usefully describes common command codes and the device codes that correspond with them.
+
+## The Broadlink IR Hex Protocol
+For this, I am mostly relying on [this description of the Broadlink IR protocol](https://github.com/mjg59/python-broadlink/blob/master/protocol.md).
+
+For IR data, the Broadlink hex protocol starts with an 8 byte header that describes the data that follows. The first 5 bytes will always be "0x020x000x000x000x26." The 6th byte will be the number of repeats. The 7th and 8th bytes represent the length of the actual data in little endian. (For reference, we usually think of numbers in big endian decimal. 124 as we undersand it would be written as 421 in little endian form). The actual data will then be transmitted from the 9th byte onwards. 
+
+The data should be paired as ON, followed by OFF pulses for the IR codes and each pulse is represented by the number of 2^-15s units that the pulse lasts for. 2^-15 is roughly 1 cycle at 38KHz. A shorthand for this, from the protocol source above, is to take the pulse length in microseconds and multiply that by 269/8192.
+
+As a worked example:
+- Take the paired pulse lengths of the 1 signal (1200, 600).
+- Multiply by 269/8192 to get (39, 19).
+- Convert to hex to end with 0x270x13.
+
+If the converted length of the pulse ends up taking up more than 1 byte (if it's larger than 255), this is represented by 0x00 followed by the big endian representation of the pulse length. This is going to occur for any pulse length greater than 7796 microseconds. For example, for a pulse with a length of 22,200 microseconds (728 units), the hex representation will be "0x000x030x3C".
