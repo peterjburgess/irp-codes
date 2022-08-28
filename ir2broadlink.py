@@ -4,8 +4,71 @@ Creates broadlink b64 ir codes from a Sony lirc.conf file.
 """
 
 from typing import Dict
+import struct
 import requests
 
+def pulse_to_broadlink_hex(pulse: int, khz: float = 38.0) -> bytearray:
+    """
+    Converts a pulse length in microseconds to a cycle count at 38kHz
+    """
+    # Get the cycle length in seconds
+    cycle_length: float = 1/(khz * 1000)
+    # Convert pulse length to seconds
+    pulse_length: float = pulse * 10 ** -6
+    # Calculate the number of whole cycles in the pulse
+    broadlink_pulse: int = int(pulse_length/cycle_length)
+    # If the pulse fits into 1 byte, treat as is.
+    # Otherwise, insert a leading 0 and split over 2 bytes big endian.
+    broadlink_hex: bytearray = bytearray()
+    if broadlink_pulse < 256:
+        broadlink_hex.append(broadlink_pulse)
+    else:
+        print(f'pulse_length: {broadlink_pulse}\n pulse: {pulse}')
+        broadlink_hex.append(0)
+        # Format for struct.pack, '>H', is a big endian short (2 byte) int
+        broadlink_hex += struct.pack('>H', broadlink_pulse)
+    return broadlink_hex
+        
+    
+
+def flatten(pulses: list[tuple[int, int]]) -> list[int]:
+    """
+    Flattens a list of tuples into a single list of ints
+    """
+    flat_list = [value for pulse in pulses for value in pulse]
+    return flat_list
+
+def pulses_to_broadlink_hex(
+        pulses: list[tuple[int, int]],
+        repeats: int = 0) -> bytes:
+    """
+    Convert a series of pules to a broadlink hex representation of the data
+    """
+    #Broadlink ir hex codes always starts with the following sequence of 5 bytes
+    broadlink_hex: bytearray = bytearray([0x02,0x00,0x00,0x00,0x26])
+    #This is followed by the number of repeats
+    if repeats > 255:
+        raise ValueError(
+                'Repeats has to be less than 256 to fit in a single byte'
+                )
+    broadlink_hex += bytearray([repeats])
+    #This will be followed by the packet length, but we don't know that yet
+
+    #Calculate packet data
+    packet: bytearray = bytearray()
+    pulses = flatten(pulses)
+    for pulse in pulses:
+        packet += pulse_to_broadlink_hex(pulse)
+
+    # Now calculate the packet length and add it to broadlink_hex as a 2 byte,
+    # little endian number
+    packet_length: int = len(packet)
+    broadlink_hex += bytearray(struct.pack('<H', packet_length))
+    # Finally add the packet
+    broadlink_hex += packet
+    return broadlink_hex
+        
+    
 def lirc_hex_to_binary(code_hex: str, bits: int) -> list[int]:
     """
     Converts a hex code into a binary, padded to the correct number of bits
@@ -143,8 +206,8 @@ def parse_lirc(text: str) -> Dict[str, str]:
 
 def main(*args, **kwargs):
     lirc_text: str = get_conf_file(args[0]).text
-    print(parse_lirc(lirc_text))
-    print(lirc_hex_to_binary('0x2A06', 14))
+    codes: Dict = parse_lirc(lirc_text)
+    return codes
 
 if __name__=='__main__':
     main('https://sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/sony/RM-U306A.lircd.conf')
