@@ -127,15 +127,15 @@ class TestPulseToBroadlinkHexConversion(unittest.TestCase):
 
     def test_pulse_to_broadlink_hex_single_byte(self):
         # Broadlink hex value for 1000 microseconds
-        single_byte_test = bytearray([0x26])
+        single_byte_test = bytearray([0x20])
         self.assertEqual(
                 single_byte_test,
                 ir2broadlink.pulse_to_broadlink_hex(1000)
                 )
 
-    def test_pulse_to_broadlin_hex_multi_byte(self):
+    def test_pulse_to_broadlink_hex_multi_byte(self):
         # Broadlink hex value for 50,000 microseconds
-        multi_byte_test = bytearray([0x00, 0x07, 0x6b])
+        multi_byte_test = bytearray([0x00, 0x06, 0x69])
         self.assertEqual(
                 multi_byte_test,
                 ir2broadlink.pulse_to_broadlink_hex(50000)
@@ -144,9 +144,8 @@ class TestPulseToBroadlinkHexConversion(unittest.TestCase):
     def test_pulse_to_broadlink_hex(self):
         pulses = [(2400, 600), (1200, 600), (600, 600), (600, 21600)]
         correct_broadlink_hex = bytearray(
-                [0x02, 0x00, 0x00, 0x00, 0x26, 0x00, 0x0a, 0x00, 
-                    0x5b, 0x16, 0x2d, 0x16, 0x16, 0x16,
-                    0x16, 0x00, 0x03, 0x34]
+                [ 0x26, 0x00, 0x0a, 0x00, 0x4E, 0x13, 0x27, 0x13, 0x13, 0x13,
+                    0x13, 0x00, 0x02, 0xC5 ]
                 )
         self.assertEqual(
                 ir2broadlink.pulses_to_broadlink_hex(pulses), 
