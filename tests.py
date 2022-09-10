@@ -1,4 +1,4 @@
-from email.utils import parsedate
+"""Test suite for the lirc to broadlink ir codes conversion module"""
 import unittest
 import ir2broadlink
 

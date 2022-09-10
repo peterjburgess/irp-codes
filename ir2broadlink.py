@@ -3,11 +3,11 @@
 Creates broadlink b64 ir codes from a Sony lirc.conf file.
 """
 
+import pprint
 from typing import Dict
 from base64 import b64encode
 import struct
 import requests
-import pprint
 
 def pulse_to_broadlink_hex(pulse: int) -> bytearray:
     """
@@ -24,7 +24,6 @@ def pulse_to_broadlink_hex(pulse: int) -> bytearray:
         # Format for struct.pack, '>H', is a big endian short (2 byte) int
         broadlink_hex += struct.pack('>H', broadlink_pulse)
     return broadlink_hex
-        
 
 def flatten(pulses: list[tuple[int, int]]) -> list[int]:
     """
@@ -62,8 +61,7 @@ def pulses_to_broadlink_hex(
     # Finally add the packet
     broadlink_hex += packet
     return broadlink_hex
-        
-    
+
 def lirc_hex_to_binary(code_hex: str, bits: int) -> list[int]:
     """
     Converts a hex code into a binary, padded to the correct number of bits
@@ -78,14 +76,13 @@ def lirc_hex_to_binary(code_hex: str, bits: int) -> list[int]:
 
 def lirc_to_pulses(lirc_config: Dict) -> Dict:
     """
-    Given an lirc config as a dictionary, convert the hex codes for 
+    Given an lirc config as a dictionary, convert the hex codes for
     each button into a set of timed pulses
     """
     header: dict = lirc_config['header']
     one: dict = lirc_config['one']
     zero: dict = lirc_config['zero']
     codes: dict = lirc_config['codes']
-    repeats: str | None = lirc_config.pop('min_repeat', None)
     gap: str | None = lirc_config.pop('gap', None)
     ptrail: str | None = lirc_config.pop('ptrail', None)
     flags: str | None = lirc_config.pop('flags', None)
@@ -104,7 +101,7 @@ def lirc_to_pulses(lirc_config: Dict) -> Dict:
         pulses: list[tuple[int, int]] = []
         pulse: tuple[int, int] = (int(header['on']), int(header['off']))
         pulses.append(pulse)
-            
+
         # Now go through the binary string and add pulses
         for bit in binary_code:
             if bit == '1':
@@ -133,7 +130,7 @@ def lirc_to_pulses(lirc_config: Dict) -> Dict:
             pulses[-1] = (final_pulse[0], pulse_gap)
 
         button_pulses[code] = pulses
-                    
+
     return button_pulses
 
 def get_conf_file(path: str) -> str:
@@ -143,8 +140,8 @@ def get_conf_file(path: str) -> str:
     path:
         Url to the lirc.conf file
     """
-    r = requests.get(path)
-    return r
+    lirc_request: requests.request = requests.get(path)
+    return lirc_request
 
 def parse_lirc(text: str) -> Dict[str, str]:
     """
@@ -209,7 +206,7 @@ def parse_lirc(text: str) -> Dict[str, str]:
 
 def code_to_broadlink(config: Dict) -> Dict:
     """
-    Converts a parsed lirc dictionary to a dictionary mapping keys to 
+    Converts a parsed lirc dictionary to a dictionary mapping keys to
     base 64 broadlink codes
     """
     broadlink_map: Dict = {}
@@ -217,18 +214,22 @@ def code_to_broadlink(config: Dict) -> Dict:
         section_config: Dict = config[section]
         repeats: int = int(section_config.pop('min_repeat', 0))
         section_pulses: Dict = lirc_to_pulses(section_config)
-        for button in section_pulses:
-            if button == 'KEY_2CH':
-                print(section_pulses[button])
+        for button, pulses in section_pulses.items():
             broadlink_map[button] = b64encode(pulses_to_broadlink_hex(
-                    section_pulses[button], repeats
+                    pulses, repeats
                     ))
     return broadlink_map
 
-def main(*args, **kwargs):
-    lirc_text: str = get_conf_file(args[0]).text
+def main(lirc_url: str) -> None:
+    """
+    Takes a url to an lirc config page and returns a base 64, Home Assistant
+    compatible list of broadlink codes.
+    """
+    lirc_text: str = get_conf_file(lirc_url).text
     codes: Dict = parse_lirc(lirc_text)
     pprint.pprint(code_to_broadlink(codes))
 
 if __name__=='__main__':
-    main('https://sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/sony/RM-U306A.lircd.conf')
+    base_url: str = 'https://sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/'
+    remote_path: str = 'sony/RM-U306A.lircd.conf'
+    main(base_url + remote_path)
