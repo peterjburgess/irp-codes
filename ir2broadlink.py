@@ -4,8 +4,66 @@ Creates broadlink b64 ir codes from a Sony lirc.conf file.
 """
 
 from typing import Dict
+from base64 import b64encode
+import struct
 import requests
+import pprint
 
+def pulse_to_broadlink_hex(pulse: int) -> bytearray:
+    """
+    Converts raw pulse length to a cycle count at about 33kHz (why not 38kHz?)
+    """
+    broadlink_pulse: int = int(pulse*269/8192) # Found online and tested to work
+    # If the pulse fits into 1 byte, treat as is.
+    # Otherwise, insert a leading 0 and split over 2 bytes big endian.
+    broadlink_hex: bytearray = bytearray()
+    if broadlink_pulse < 256:
+        broadlink_hex.append(broadlink_pulse)
+    else:
+        broadlink_hex.append(0)
+        # Format for struct.pack, '>H', is a big endian short (2 byte) int
+        broadlink_hex += struct.pack('>H', broadlink_pulse)
+    return broadlink_hex
+        
+
+def flatten(pulses: list[tuple[int, int]]) -> list[int]:
+    """
+    Flattens a list of tuples into a single list of ints
+    """
+    flat_list = [value for pulse in pulses for value in pulse]
+    return flat_list
+
+def pulses_to_broadlink_hex(
+        pulses: list[tuple[int, int]],
+        repeats: int = 0) -> bytes:
+    """
+    Convert a series of pules to a broadlink hex representation of the data
+    """
+    # [0x26] to indicate an IR code is being sent
+    broadlink_hex: bytearray = bytearray([0x26])
+    #This is followed by the number of repeats
+    if repeats > 255:
+        raise ValueError(
+                'Repeats has to be less than 256 to fit in a single byte'
+                )
+    broadlink_hex += bytearray([repeats])
+    #This will be followed by the packet length, but we don't know that yet
+
+    #Calculate packet data
+    packet: bytearray = bytearray()
+    pulses = flatten(pulses)
+    for pulse in pulses:
+        packet += pulse_to_broadlink_hex(pulse)
+
+    # Now calculate the packet length and add it to broadlink_hex as a 2 byte,
+    # little endian number
+    packet_length: int = len(packet)
+    broadlink_hex += bytearray(struct.pack('<H', packet_length))
+    # Finally add the packet
+    broadlink_hex += packet
+    return broadlink_hex
+        
+    
 def lirc_hex_to_binary(code_hex: str, bits: int) -> list[int]:
     """
     Converts a hex code into a binary, padded to the correct number of bits
@@ -31,12 +89,17 @@ def lirc_to_pulses(lirc_config: Dict) -> Dict:
     gap: str | None = lirc_config.pop('gap', None)
     ptrail: str | None = lirc_config.pop('ptrail', None)
     flags: str | None = lirc_config.pop('flags', None)
+    post_data: str | None = lirc_config.pop('post_data', None)
 
     button_pulses: dict = {}
     for code in codes:
         # Get the binary representation of the codes
-        number_of_bits = int(lirc_config['bits'])
+        number_of_bits: int = int(lirc_config['bits'])
         binary_code: str = lirc_hex_to_binary(codes[code], number_of_bits)
+        # Add post data bits if they exist
+        if post_data:
+            number_of_bits = int(lirc_config['post_data_bits'])
+            binary_code += lirc_hex_to_binary(post_data, number_of_bits)
         # Start with a set of pulses for the header
         pulses: list[tuple[int, int]] = []
         pulse: tuple[int, int] = (int(header['on']), int(header['off']))
@@ -62,9 +125,12 @@ def lirc_to_pulses(lirc_config: Dict) -> Dict:
             trail = int(ptrail)
             pulse_gap = pulse_gap - trail
             pulse = (trail, pulse_gap)
-
-        pulse = (trail, pulse_gap)
-        pulses.append(pulse)
+            pulses.append(pulse)
+        # If there is no ptrail, add the gap to the last value in the last tuple
+        else:
+            final_pulse: tuple[int, int] = pulses[-1]
+            pulse_gap += final_pulse[-1]
+            pulses[-1] = (final_pulse[0], pulse_gap)
 
         button_pulses[code] = pulses
                     
@@ -141,10 +207,28 @@ def parse_lirc(text: str) -> Dict[str, str]:
 
     return remote_config
 
+def code_to_broadlink(config: Dict) -> Dict:
+    """
+    Converts a parsed lirc dictionary to a dictionary mapping keys to 
+    base 64 broadlink codes
+    """
+    broadlink_map: Dict = {}
+    for section in config:
+        section_config: Dict = config[section]
+        repeats: int = int(section_config.pop('min_repeat', 0))
+        section_pulses: Dict = lirc_to_pulses(section_config)
+        for button in section_pulses:
+            if button == 'KEY_2CH':
+                print(section_pulses[button])
+            broadlink_map[button] = b64encode(pulses_to_broadlink_hex(
+                    section_pulses[button], repeats
+                    ))
+    return broadlink_map
+
 def main(*args, **kwargs):
     lirc_text: str = get_conf_file(args[0]).text
-    print(parse_lirc(lirc_text))
-    print(lirc_hex_to_binary('0x2A06', 14))
+    codes: Dict = parse_lirc(lirc_text)
+    pprint.pprint(code_to_broadlink(codes))
 
 if __name__=='__main__':
     main('https://sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/sony/RM-U306A.lircd.conf')
