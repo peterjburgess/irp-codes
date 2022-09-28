@@ -55,13 +55,15 @@ To demonstrate as an example, I will use the lirc file for my remote, the RM-U30
 - And in the official Sony encoding, the device code is 0000 1100 with the least significant digit first, which comes out to a device code of 30 in hex, or 48 in decimal. The command code is then 0000 011 in binary, with the least significant digit first, which corresponds to 0x60 hex, or 96 in decimal. As a sense check, this corresponds with the information on [this page](http://www.hifi-remote.com/sony/Sony_rcvr.htm), which usefully describes common command codes and the device codes that correspond with them.
 
 ## The Broadlink IR Hex Protocol
+
 For this, I am mostly relying on [this description of the Broadlink IR protocol](https://github.com/mjg59/python-broadlink/blob/master/protocol.md).
 
-For IR data, the Broadlink hex protocol starts with an 8 byte header that describes the data that follows. The first 5 bytes will always be "0x020x000x000x000x26." The 6th byte will be the number of repeats. The 7th and 8th bytes represent the length of the actual data in little endian. (For reference, we usually think of numbers in big endian decimal. 124 as we undersand it would be written as 421 in little endian form). The actual data will then be transmitted from the 9th byte onwards. 
+For IR data, the Broadlink hex protocol starts with an 8 byte header that describes the data that follows. The first 5 bytes will always be "0x020x000x000x000x26." The 6th byte will be the number of repeats. The 7th and 8th bytes represent the length of the actual data in little endian. (For reference, we usually think of numbers in big endian decimal. 124 as we undersand it would be written as 421 in little endian form). The actual data will then be transmitted from the 9th byte onwards.
 
 The data should be paired as ON, followed by OFF pulses for the IR codes and each pulse is represented by the number of 2^-15s units that the pulse lasts for. 2^-15 is roughly 1 cycle at 38KHz. A shorthand for this, from the protocol source above, is to take the pulse length in microseconds and multiply that by 269/8192.
 
 As a worked example:
+
 - Take the paired pulse lengths of the 1 signal (1200, 600).
 - Multiply by 269/8192 to get (39, 19).
 - Convert to hex to end with 0x270x13.

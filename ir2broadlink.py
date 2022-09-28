@@ -3,11 +3,17 @@
 Creates broadlink b64 ir codes from a Sony lirc.conf file.
 """
 
-from typing import Dict
+import pprint
+from typing import Dict, Any
 from base64 import b64encode
 import struct
 import requests
-import pprint
+
+# Type aliases
+Pulse = tuple[int, int]
+Pulses = list[Pulse]
+SubConfig = Dict[str, str]
+Config = Dict[str, Any]
 
 def pulse_to_broadlink_hex(pulse: int) -> bytearray:
     """
@@ -24,9 +30,8 @@ def pulse_to_broadlink_hex(pulse: int) -> bytearray:
         # Format for struct.pack, '>H', is a big endian short (2 byte) int
         broadlink_hex += struct.pack('>H', broadlink_pulse)
     return broadlink_hex
-        
 
-def flatten(pulses: list[tuple[int, int]]) -> list[int]:
+def flatten(pulses: Pulses) -> list[int]:
     """
     Flattens a list of tuples into a single list of ints
     """
@@ -34,25 +39,24 @@ def flatten(pulses: list[tuple[int, int]]) -> list[int]:
     return flat_list
 
 def pulses_to_broadlink_hex(
-        pulses: list[tuple[int, int]],
+        pulses: Pulses,
         repeats: int = 0) -> bytes:
     """
     Convert a series of pules to a broadlink hex representation of the data
     """
     # [0x26] to indicate an IR code is being sent
     broadlink_hex: bytearray = bytearray([0x26])
-    #This is followed by the number of repeats
+    # This is followed by the number of repeats
     if repeats > 255:
         raise ValueError(
                 'Repeats has to be less than 256 to fit in a single byte'
                 )
     broadlink_hex += bytearray([repeats])
-    #This will be followed by the packet length, but we don't know that yet
 
-    #Calculate packet data
+    # Calculate packet data
     packet: bytearray = bytearray()
-    pulses = flatten(pulses)
-    for pulse in pulses:
+    flat_pulses: list[int] = flatten(pulses)
+    for pulse in flat_pulses:
         packet += pulse_to_broadlink_hex(pulse)
 
     # Now calculate the packet length and add it to broadlink_hex as a 2 byte,
@@ -62,9 +66,8 @@ def pulses_to_broadlink_hex(
     # Finally add the packet
     broadlink_hex += packet
     return broadlink_hex
-        
-    
-def lirc_hex_to_binary(code_hex: str, bits: int) -> list[int]:
+
+def lirc_hex_to_binary(code_hex: str, bits: int) -> str:
     """
     Converts a hex code into a binary, padded to the correct number of bits
     """
@@ -76,22 +79,21 @@ def lirc_hex_to_binary(code_hex: str, bits: int) -> list[int]:
     padding_length: int = bits - len(binary_representation)
     return '0' * padding_length + binary_representation
 
-def lirc_to_pulses(lirc_config: Dict) -> Dict:
+def lirc_to_pulses(lirc_config: Config) -> Config:
     """
-    Given an lirc config as a dictionary, convert the hex codes for 
+    Given an lirc config as a dictionary, convert the hex codes for
     each button into a set of timed pulses
     """
-    header: dict = lirc_config['header']
-    one: dict = lirc_config['one']
-    zero: dict = lirc_config['zero']
-    codes: dict = lirc_config['codes']
-    repeats: str | None = lirc_config.pop('min_repeat', None)
-    gap: str | None = lirc_config.pop('gap', None)
+    header: SubConfig = lirc_config['header']
+    one: SubConfig = lirc_config['one']
+    zero: SubConfig = lirc_config['zero']
+    codes: SubConfig = lirc_config['codes']
+    gap: str = lirc_config.pop('gap', '0')
     ptrail: str | None = lirc_config.pop('ptrail', None)
     flags: str | None = lirc_config.pop('flags', None)
     post_data: str | None = lirc_config.pop('post_data', None)
 
-    button_pulses: dict = {}
+    button_pulses: Config = {}
     for code in codes:
         # Get the binary representation of the codes
         number_of_bits: int = int(lirc_config['bits'])
@@ -101,10 +103,10 @@ def lirc_to_pulses(lirc_config: Dict) -> Dict:
             number_of_bits = int(lirc_config['post_data_bits'])
             binary_code += lirc_hex_to_binary(post_data, number_of_bits)
         # Start with a set of pulses for the header
-        pulses: list[tuple[int, int]] = []
-        pulse: tuple[int, int] = (int(header['on']), int(header['off']))
+        pulses: Pulses = []
+        pulse: Pulse = (int(header['on']), int(header['off']))
         pulses.append(pulse)
-            
+
         # Now go through the binary string and add pulses
         for bit in binary_code:
             if bit == '1':
@@ -128,30 +130,30 @@ def lirc_to_pulses(lirc_config: Dict) -> Dict:
             pulses.append(pulse)
         # If there is no ptrail, add the gap to the last value in the last tuple
         else:
-            final_pulse: tuple[int, int] = pulses[-1]
+            final_pulse: Pulse = pulses[-1]
             pulse_gap += final_pulse[-1]
             pulses[-1] = (final_pulse[0], pulse_gap)
 
         button_pulses[code] = pulses
-                    
+
     return button_pulses
 
-def get_conf_file(path: str) -> str:
+def get_conf_file(path: str) -> requests.Response:
     """
     Pulls an lirc.conf file from the given path and returns the page text
     Parameters:
     path:
         Url to the lirc.conf file
     """
-    r = requests.get(path)
-    return r
+    lirc_request: requests.Response = requests.get(path)
+    return lirc_request
 
-def parse_lirc(text: str) -> Dict[str, str]:
+def parse_lirc(text: str) -> Config:
     """
     Parses a string and creates a dict with the parameters of the remote
     """
     # Create an empty dict to store the configuration
-    remote_config: Dict = {}
+    remote_config: Config = {}
 
     # Read through text line by line until "begin remote" is found.
     read_line_flag: bool = False # determines whether to skip the line
@@ -161,7 +163,7 @@ def parse_lirc(text: str) -> Dict[str, str]:
     for line in text.split('\n'):
         if line == 'begin remote':
             read_line_flag = True
-            section_config: Dict = {}
+            section_config: Config = {}
             continue # Don't read in the "begin remote" line
 
         if line == 'end remote':
@@ -176,7 +178,7 @@ def parse_lirc(text: str) -> Dict[str, str]:
         # Set code block flag
         if 'begin codes' in line:
             read_code_flag = True
-            codes: Dict[str, str] = {} # setting up separate dict for the codes
+            codes: SubConfig = {} # setting up separate dict for the codes
             continue
         elif 'end codes' in line:
             read_code_flag = False
@@ -197,7 +199,7 @@ def parse_lirc(text: str) -> Dict[str, str]:
             section_config[line_elements[0]] = line_elements[1]
         # For 3 elements create a subdict for on and off timings
         elif len(line_elements) == 3:
-            sub_dict: Dict[str, str] = {}
+            sub_dict: SubConfig = {}
             sub_dict['on'] = line_elements[1]
             sub_dict['off'] = line_elements[2]
             section_config[line_elements[0]] = sub_dict
@@ -207,28 +209,33 @@ def parse_lirc(text: str) -> Dict[str, str]:
 
     return remote_config
 
-def code_to_broadlink(config: Dict) -> Dict:
+def code_to_broadlink(config: Config) -> Config:
     """
-    Converts a parsed lirc dictionary to a dictionary mapping keys to 
+    Converts a parsed lirc dictionary to a dictionary mapping keys to
     base 64 broadlink codes
     """
-    broadlink_map: Dict = {}
+    broadlink_map: Config = {}
     for section in config:
-        section_config: Dict = config[section]
+        section_config: Config = config[section]
         repeats: int = int(section_config.pop('min_repeat', 0))
-        section_pulses: Dict = lirc_to_pulses(section_config)
-        for button in section_pulses:
-            if button == 'KEY_2CH':
-                print(section_pulses[button])
+        section_pulses: Config = lirc_to_pulses(section_config)
+        for button, pulses in section_pulses.items():
             broadlink_map[button] = b64encode(pulses_to_broadlink_hex(
-                    section_pulses[button], repeats
+                    pulses, repeats
                     ))
     return broadlink_map
 
-def main(*args, **kwargs):
-    lirc_text: str = get_conf_file(args[0]).text
-    codes: Dict = parse_lirc(lirc_text)
-    pprint.pprint(code_to_broadlink(codes))
+def main(lirc_url: str) -> None:
+    """
+    Takes a url to an lirc config page and returns a base 64, Home Assistant
+    compatible list of broadlink codes.
+    """
+    lirc_text: str = get_conf_file(lirc_url).text
+    codes: Config = parse_lirc(lirc_text)
+    pprint.pprint(codes)
+    #pprint.pprint(code_to_broadlink(codes))
 
 if __name__=='__main__':
-    main('https://sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/sony/RM-U306A.lircd.conf')
+    base_url: str = 'https://sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/'
+    remote_path: str = 'sony/RM-U306A.lircd.conf'
+    main(base_url + remote_path)
