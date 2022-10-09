@@ -1,12 +1,12 @@
 """Test suite for the lirc to broadlink ir codes conversion module"""
 import unittest
-import ir2broadlink
+import lirc2broadlinkha
 
 class TestLircRetrieval(unittest.TestCase):
     """Tests that the LIRC configuration file is retrieved correctly"""
     # Set up with a get request to a lirc conf file
     def setUp(self):
-        self.response = ir2broadlink.get_conf_file(
+        self.response = lirc2broadlinkha.get_conf_file(
             'https://sourceforge.net/p/lirc-remotes' \
             '/code/ci/master/tree/remotes/sony/RM-U306A.lircd.conf'
             )
@@ -179,7 +179,7 @@ class TestLircToPulseConversion(unittest.TestCase):
     def test_simple_binary_conversion(self):
         """Test that simple lirc config correctly converts to binary"""
         for code in self.simple_code['codes']:
-            parsed_binary_code = ir2broadlink.lirc_hex_to_binary(
+            parsed_binary_code = lirc2broadlinkha.lirc_hex_to_binary(
                 code_hex=self.simple_code['codes'][code],
                 bits=self.simple_code['bits'])
             correct_binary_code = self.correct_simple_codes[code]
@@ -187,13 +187,13 @@ class TestLircToPulseConversion(unittest.TestCase):
 
     def test_simple_pulse_conversion(self):
         """Test that simple lirc config correctly converts to pulses"""
-        pulses = ir2broadlink.lirc_to_pulses(self.simple_code)
+        pulses = lirc2broadlinkha.lirc_to_pulses(self.simple_code)
         self.assertEqual(pulses, self.correct_simple_pulses)
 
     def test_code_trail_binary_conversion(self):
         """Test that lirc config with a ptrail correctly converts to binary"""
         for code in self.code_with_trail['codes']:
-            parsed_binary_code = ir2broadlink.lirc_hex_to_binary(
+            parsed_binary_code = lirc2broadlinkha.lirc_hex_to_binary(
                 code_hex=self.code_with_trail['codes'][code],
                 bits=self.code_with_trail['bits'])
             correct_binary_code = self.correct_trail_codes[code]
@@ -201,13 +201,13 @@ class TestLircToPulseConversion(unittest.TestCase):
 
     def test_trail_pulse_conversion(self):
         """Test that lirc config with a ptrail correctly converts to pulses"""
-        pulses = ir2broadlink.lirc_to_pulses(self.code_with_trail)
+        pulses = lirc2broadlinkha.lirc_to_pulses(self.code_with_trail)
         self.assertEqual(pulses, self.correct_trail_pulses)
 
     def test_no_trail_binary_conversion(self):
         """Test that lirc config without ptrail correctly converts to binary"""
         for code in self.code_without_trail['codes']:
-            parsed_binary_code = ir2broadlink.lirc_hex_to_binary(
+            parsed_binary_code = lirc2broadlinkha.lirc_hex_to_binary(
                 code_hex=self.code_without_trail['codes'][code],
                 bits=self.code_without_trail['bits']
             )
@@ -216,13 +216,13 @@ class TestLircToPulseConversion(unittest.TestCase):
 
     def test_no_trail_pulse_conversion(self):
         """Test that lirc config without ptrail correctly converts to pulses"""
-        pulses = ir2broadlink.lirc_to_pulses(self.code_without_trail)
+        pulses = lirc2broadlinkha.lirc_to_pulses(self.code_without_trail)
         self.assertEqual(pulses, self.correct_no_trail_pulses)
 
     def test_post_data_binary_conversion(self):
         """Test that lirc config with post data correctly converts to binary"""
         for code in self.code_with_post_data['codes']:
-            parsed_binary_code = ir2broadlink.lirc_hex_to_binary(
+            parsed_binary_code = lirc2broadlinkha.lirc_hex_to_binary(
                 code_hex=self.code_with_post_data['codes'][code],
                 bits=self.code_with_post_data['bits']
             )
@@ -231,7 +231,7 @@ class TestLircToPulseConversion(unittest.TestCase):
 
     def test_post_data_pulse_conversion(self):
         """Test that lirc config with post data correctly converts to pulses"""
-        pulses = ir2broadlink.lirc_to_pulses(self.code_with_post_data)
+        pulses = lirc2broadlinkha.lirc_to_pulses(self.code_with_post_data)
         self.assertEqual(pulses, self.correct_post_data_pulses)
 
 class TestPulseToBroadlinkHexConversion(unittest.TestCase):
@@ -241,7 +241,7 @@ class TestPulseToBroadlinkHexConversion(unittest.TestCase):
         """Tests that list of tuples correctly flattens to list of ints"""
         pulses = [(40, 40), (80, 40), (40, 40), (40, 3600)]
         flat_list = [40, 40, 80, 40, 40, 40, 40, 3600]
-        self.assertEqual(ir2broadlink.flatten(pulses), flat_list)
+        self.assertEqual(lirc2broadlinkha.flatten(pulses), flat_list)
 
     def test_pulse_to_broadlink_hex_single_byte(self):
         """
@@ -252,7 +252,7 @@ class TestPulseToBroadlinkHexConversion(unittest.TestCase):
         single_byte_test = bytearray([0x20])
         self.assertEqual(
                 single_byte_test,
-                ir2broadlink.pulse_to_broadlink_hex(1000)
+                lirc2broadlinkha.pulse_to_broadlink_hex(1000)
                 )
 
     def test_pulse_to_broadlink_hex_multi_byte(self):
@@ -264,7 +264,7 @@ class TestPulseToBroadlinkHexConversion(unittest.TestCase):
         multi_byte_test = bytearray([0x00, 0x06, 0x69])
         self.assertEqual(
                 multi_byte_test,
-                ir2broadlink.pulse_to_broadlink_hex(50000)
+                lirc2broadlinkha.pulse_to_broadlink_hex(50000)
                 )
 
     def test_pulse_to_broadlink_hex(self):
@@ -275,7 +275,7 @@ class TestPulseToBroadlinkHexConversion(unittest.TestCase):
                     0x13, 0x00, 0x02, 0xC5 ]
                 )
         self.assertEqual(
-                ir2broadlink.pulses_to_broadlink_hex(pulses),
+                lirc2broadlinkha.pulses_to_broadlink_hex(pulses),
                 correct_broadlink_hex
                 )
 

@@ -1,6 +1,6 @@
-# sonylirc2broadlink
+# lirc2broadlinkha
 """
-Creates broadlink b64 ir codes from a Sony lirc.conf file.
+Creates broadlink b64 ir codes from an lirc.conf file.
 """
 
 import pprint
