@@ -222,7 +222,7 @@ def code_to_broadlink(config: Config) -> Config:
         for button, pulses in section_pulses.items():
             broadlink_map[button] = b64encode(pulses_to_broadlink_hex(
                     pulses, repeats
-                    ))
+                    )).decode('utf-8')
     return broadlink_map
 
 def main(lirc_url: str) -> None:
@@ -232,8 +232,8 @@ def main(lirc_url: str) -> None:
     """
     lirc_text: str = get_conf_file(lirc_url).text
     codes: Config = parse_lirc(lirc_text)
-    pprint.pprint(codes)
-    #pprint.pprint(code_to_broadlink(codes))
+    #pprint.pprint(codes)
+    pprint.pprint(code_to_broadlink(codes))
 
 if __name__=='__main__':
     base_url: str = 'https://sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/'

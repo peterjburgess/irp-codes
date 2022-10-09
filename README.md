@@ -60,7 +60,7 @@ For this, I am mostly relying on [this description of the Broadlink IR protocol]
 
 For IR data, the Broadlink hex protocol starts with an 8 byte header that describes the data that follows. The first 5 bytes will always be "0x020x000x000x000x26." The 6th byte will be the number of repeats. The 7th and 8th bytes represent the length of the actual data in little endian. (For reference, we usually think of numbers in big endian decimal. 124 as we undersand it would be written as 421 in little endian form). The actual data will then be transmitted from the 9th byte onwards.
 
-The data should be paired as ON, followed by OFF pulses for the IR codes and each pulse is represented by the number of 2^-15s units that the pulse lasts for. 2^-15 is roughly 1 cycle at 38KHz. A shorthand for this, from the protocol source above, is to take the pulse length in microseconds and multiply that by 269/8192.
+The data should be paired as ON, followed by OFF pulses for the IR codes and each pulse is represented by the number of 2^-15s units that the pulse lasts for. Naively, this should work, but for reasons I don't understand, rather than using 1/38000 (2.63x10^-5), we instead use 2^-15(3.05x10^-5) as the cycle length (this is closer to a freqency of 33kHz). A shorthand for this, from the protocol source above, is to take the pulse length in microseconds and multiply that by 269/8192.
 
 As a worked example:
 
