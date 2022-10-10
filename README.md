@@ -5,8 +5,11 @@ A Python 3 project to create Home Assistant Broadlink integration compatible scr
 ## Basic Usage
 
 From the command line:
+
     python create_ha_script.py *url_to_lirc_page entity_name [output_file]*
+    
 or if your default system Python is Python 2
+
     python3 create_ha_script.py *url_to_lirc_page entity_name [output_file]*
     
 - The first argument is the url to the lirc page you want to translate to Home Assistant compatible script syntax.
