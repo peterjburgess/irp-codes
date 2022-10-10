@@ -17,7 +17,11 @@ def create_script(button: str, code:str, entity_name: str) -> dict:
     """
 
     # First sanitize the button name. Must be lower case without any dashes
-    button_name: str = button.lower().replace('-', '_')
+    button_name: str = button.lower()
+    for char in '&;':
+        button_name = button_name.replace(char, '')
+    button_name = button_name.replace('+', '_plus')
+    button_name = button_name.replace('-', '_minus')
     
     # Build the Home Assistant script
     script: dict = {
@@ -67,7 +71,7 @@ if __name__ == '__main__':
         entity_name = f'remote.{entity_name}'
 
     # Check for existence of outfile argument
-    if len(argv) > 2:
+    if len(argv) > 3:
         outfile = argv[3]
 
     main(lirc_url, entity_name, outfile)

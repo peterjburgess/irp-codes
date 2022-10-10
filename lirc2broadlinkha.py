@@ -225,15 +225,20 @@ def code_to_broadlink(config: Config) -> Config:
                     )).decode('utf-8')
     return broadlink_map
 
-def main(lirc_url: str) -> None:
+def create_mapping(lirc_url: str) -> Config:
     """
     Takes a url to an lirc config page and returns a base 64, Home Assistant
-    compatible list of broadlink codes.
+    compatible list of remote codes
     """
     lirc_text: str = get_conf_file(lirc_url).text
     codes: Config = parse_lirc(lirc_text)
-    #pprint.pprint(codes)
-    pprint.pprint(code_to_broadlink(codes))
+    return code_to_broadlink(codes)
+
+def main(lirc_url: str) -> None:
+    """
+    Pretty prints a dictionary of base 64, Home Assistant compatible remote codes
+    """
+    pprint.pprint(create_mapping(lirc_url))
 
 if __name__=='__main__':
     base_url: str = 'https://sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/'
